@@ -17,6 +17,7 @@ ALLOWED_HOSTS = [
     'backend.recychbs.in',
     'localhost',
     '127.0.0.1',
+    'backend-recyc-ts.onrender.com',
 ]
 
 
