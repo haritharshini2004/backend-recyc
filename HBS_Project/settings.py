@@ -28,9 +28,10 @@ SECRET_KEY = 'django-insecure-f247#btkri*v8$@^pbnr7mf@&#llh59-*$x7b5p^-$d4&gwsjp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['django-djreact-app-d5af3d4e3559.herokuapp.com']
-ALLOWED_HOSTS = ['www.recychbsadmin.in']
-ALLOWED_HOSTS = ['.vercel.app', '.now.sh']
+# ALLOWED_HOSTS = ['django-djreact-app-d5af3d4e3559.herokuapp.com']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost','https://recychbs-7f558d40e2a6.herokuapp.com/']
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -44,7 +45,7 @@ INSTALLED_APPS = [
     'CustomUser',
     'corsheaders',
     'storages',
-
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -103,8 +104,59 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'HBS_Project.wsgi.application'
+ASGI_APPLICATION = "HBS_Project.asgi.application"
+
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [("127.0.0.1", 6379)],
+#         },
+#     },
+# }
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 
+# Database
+# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+
+# DATABASES = {
+#     'default': dj_database_url.parse(os.environ.get('mysql://vp74v4k1viap1uyd:t2ubeigrwyu0jqyg@qbhol6k6vexd5qjs.cbetxkdyhwsb.us-east-1.rds.amazonaws.com:3306/bong599rpr85d37q'), conn_max_age=600)
+# }
+# mysql://kaeke0tmhf4bz69i:up8pxiy2537ajbi7@z12itfj4c1vgopf8.cbetxkdyhwsb.us-east-1.rds.amazonaws.com:3306/dp3ec3zdfkpv7pgx
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'hudsmer',
+        'HOST':'82.112.238.156',
+        'USER':'hudsmer_user',
+        'PASSWORD':'Hudsmer@123',
+        'PORT':'3306',
+       
+    }
+}
+# DATABASES = {
+#     'default': {
+#         # 'ENGINE': 'mysql.connector.django',
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'di3iomsakqwry3y2',
+#         'HOST':'qbhol6k6vexd5qjs.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+#         'USER':'duffxo0thwkv74na',
+#         'PASSWORD':'zjsctuq1ij8hvl41',
+#         'PORT':'3306',
+#         'CONN_MAX_AGE': 60,  # Close connection after 60 seconds of idle time
+#         # 'OPTIONS': {
+#         #     'pool_name': 'my_connection_pool',
+#         #     'pool_size': 5,  # Set this lower to avoid hitting the max limit
+#         # }
+#         'MAX_CONNS': 5,        # Limit the max number of connections (optional)
+
+#     }
+# }
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.mysql',
@@ -116,22 +168,42 @@ WSGI_APPLICATION = 'HBS_Project.wsgi.application'
 #     }
 # }
 
-DATABASES = {
-    'default' : {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME':'recychbs_db',
-        'HOST':'82.112.238.156',
-        'USER':'vpsdb',
-        'PASSWORD':'Hudsmer@123',
-        'PORT':'3306'
-    }
-}
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',  # MySQL engine for Django
+#         'NAME': 'if0_37564101_recycle',        # Your database name
+#         'HOST': 'sql307.infinityfree.com',     # Make sure there is no tab or extra space
+#         'USER': 'if0_37564101',                # Your MySQL username
+#         'PASSWORD': 'ZUxFS1SIMN8IHS',          # Your MySQL password
+#         'PORT': '3306',                        # MySQL default port
+#         'CONN_MAX_AGE': 60,                    # Optional, maintain DB connection for 60 seconds
+#     }
+# }
+
+
+# DATABASES = {
+#     'default': {
+#         # 'ENGINE': 'mysql.connector.django',
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'recychbsDatabase',
+#         'HOST':'mydatabase.c7uwckmeq5ur.eu-north-1.rds.amazonaws.com',
+#         'USER':'admin',
+#         'PASSWORD':'HUDSMERBUSINESSSOLUTIONS',
+#         'PORT':'3306',
+#         'CONN_MAX_AGE': 60,  # Close connection after 60 seconds of idle time
+#     }
+# }
+
+
+
 
 # Custom User
 # AUTHENTICATION_BACKENDS = [
 #     'HBS_Project.backends.UsernamePhoneBackend',  # Custom backend for username, phone, and password
 #     'django.contrib.auth.backends.ModelBackend',  # Default backend
 # ]
+
 AUTH_USER_MODEL = 'CustomUser.User'
 
 
@@ -169,6 +241,15 @@ USE_I18N = True
 
 USE_TZ = True
 
+# settings.py
+AUTHENTICATION_BACKENDS = [
+    'CustomUser.backends.EmailBackend',  # Custom backend
+    'django.contrib.auth.backends.ModelBackend',
+  
+    # 'CustomUser.backends.EmailBackend',  # Adjust to match your app name
+    # 'django.contrib.auth.backends.ModelBackend'
+]
+
 
 
 # Default primary key field type
@@ -180,7 +261,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',  # React app's URL
     'http://localhost:5174',
-    'https://www.recychbsadmin.in',  # React app's URL
+    'https://django-djreact-app-d5af3d4e3559.herokuapp.com',  # React app's URL
     'https://adminapp-46edb27550db.herokuapp.com',  # React app's URL
     'https://hsb-admin-ui.onrender.com',
     'https://hsb-ui.onrender.com',
@@ -198,7 +279,7 @@ CORS_ALLOW_CREDENTIALS = True  # Allow credentials like cookies to be included
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:5173',  # React app's URL
     'http://localhost:5174',
-    'https://www.recychbsadmin.in/',  # React app's URL
+    'https://django-djreact-app-d5af3d4e3559.herokuapp.com',  # React app's URL
     'https://adminapp-46edb27550db.herokuapp.com',  # React app's URL
     'https://hsb-admin-ui.onrender.com',
     'https://hsb-ui.onrender.com',
@@ -264,49 +345,11 @@ from django.conf import settings
 # AWS_S3_FILE_OVERWRITE = True
 # AWS_S3_VERITY = True
 
-# Set the default file storage to Google Cloud Storage
+# # Static files (CSS, JavaScript, etc.)
+# # STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+# # STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
 
-# Your Google Cloud credentials JSON file
-# GOOGLE_APPLICATION_CREDENTIALS = r'C:\Users\user\Documents\my_recyc\django-djreact-app\service-account-key.json'
-
-# Set your Google Cloud Storage bucket name
-  # Replace with your bucket name
-
-# If you want to use a specific region for the bucket (optional)
-# GS_LOCATION = 'asia-south1'  # Ensure no spaces around the region name
-
-# Optional: Set a custom domain or URL for serving files
-# GS_CUSTOM_DOMAIN = f"storage.googleapis.com/{GS_BUCKET_NAME}"
-
-# Set up MEDIA_URL to serve media files from Google Cloud Storage
-# MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
-
-# Set MEDIA_ROOT to None because files will be uploaded directly to GCS
-# MEDIA_ROOT = None
-
-
-
-
-#from google.oauth2 import service_account
-
-# Corrected line
-#GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
-#    os.path.join(BASE_DIR, 'service-account-key.json')
-#)
-
-#DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
-#GS_PROJECT_ID = 'recychbs-442304'
-#GS_BUCKET_NAME = 'hbs_recyc'
-#MEDIA_ROOT = "media/"
-#UPLOAD_ROOT = 'media/uploads/'
-#MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/media/'
-
-
-# Static files (CSS, JavaScript, etc.)
-# STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-# STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
-
-# Media files
+# # Media files
 # DEFAULT_FILE_STORAGE = 'CustomUser.storages.MediaStorage'  # Replace with the path to your storages.py
 # MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
 
@@ -333,6 +376,6 @@ PASSWORD_RESET_TIMEOUT_DAYS = 1  # Password reset token will be valid for 1 day
 
 
 # settings.py (Django)
-FRONTEND_URL = "https://www.recychbsadmin.in/"  # Set this to your actual frontend URL
+FRONTEND_URL = "https://django-djreact-app-d5af3d4e3559.herokuapp.com"  # Set this to your actual frontend URL
 
 GDAL_LIBRARY_PATH = os.path.join('C:\\OSGeo4W\\bin\\adal.dll')  # Adjust 'gdal304.dll' as necessary

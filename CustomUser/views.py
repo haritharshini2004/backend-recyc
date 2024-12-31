@@ -16,9 +16,12 @@ import requests
 import random
 from twilio.rest import Client
 from django.db import connection
+# from HBS_Project.backends import EmailBackend
+
 
 # for email template
-
+from django.contrib.auth.backends import ModelBackend
+from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
@@ -46,6 +49,25 @@ import uuid
 
 # for notification
 from plyer import notification
+
+#for bucket
+import logging
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render
+import boto3
+from botocore.exceptions import NoCredentialsError
+
+# for location 
+# Location
+from django.contrib.auth import get_user_model
+from geopy.distance import great_circle
+
+User = get_user_model()  # Reference to the User model
+
+from django.contrib.auth import get_user_model
+from geopy.distance import great_circle
+
 # from win10toast import ToastNotifier
 
 class IndexView(TemplateView):
@@ -125,8 +147,6 @@ def fetch_approve_dealer(request):
         print("User:", request.user)
         print("Authenticated:", request.user.is_authenticated)
 
-
-
         data  = list(Dealer_Details.objects.filter(Dealer_ID=dealer_id).values())
         connection.close()
 
@@ -155,6 +175,7 @@ def send_extraData(request):
 
     table = Dealer_Details.objects.get(Dealer_ID=dealer_id)
     table.dealer_message = message
+    
     # Dynamically assign files or set None if list is empty
     table.extradata_field1 = file1[0] if file1 else None
     table.extradata_field2 = file2[0] if file2 else None
@@ -256,16 +277,10 @@ def otp_send(request):
             email = register_data.get('email')
             Phone_Number = register_data.get('contact')
             password = make_password(register_data.get('password'))
-            role = register_data.get('role', '').strip().upper()
-            print("role",role)
+            role = register_data.get('role')
+
             print("This is From OTP block  -", email)
             print("This is From OTP block  data-", register_data)
-
-
-
-
-
-            
 
             if role == User.USER:
                 address = register_data.get('address')
@@ -273,9 +288,9 @@ def otp_send(request):
                 state = register_data.get('state')
                 pincode = register_data.get('pincode')
                 Natioanality = register_data.get('country')
+                street = register_data.get('street')
 
-
-                address = f"{address},{city},{state},{pincode}"
+                Address = f"{address},{street},{city},{state},{pincode}"
                     # OTP Block
                 # response =  request.session['otp_response']
                 
@@ -338,7 +353,7 @@ def otp_send(request):
                             user=user,
                             User_Name = username,
                             Email = email,
-                            Address = address,
+                            Address = Address,
                             Phone_Number = Phone_Number,
                             Nationality = Natioanality
 
@@ -378,19 +393,19 @@ def otp_send(request):
                     
 
             elif role == User.DEALER:
-                print("dealerrr")
                 address = register_data.get('address')
                 city = register_data.get('city')
                 state = register_data.get('state')
                 pincode = register_data.get('pincode')
                 Natioanality = register_data.get('country')
+                street = register_data.get('street')
 
-                address = f"{address},{city},{state},{pincode}"
+                Address = f"{address},{street},{city},{state},{pincode}"
                 
                     # Compare the entered OTP with the generated OTP
                 data = json.loads(request.body)
                 entered_otp = data.get('enteredOtp')
-                print("entered_otp",entered_otp)
+
                 otp = request.session.get('otp')
                 # resend_otp = request.session['resend_otp']
         
@@ -398,21 +413,20 @@ def otp_send(request):
                 print("Generated String  OTP -",str(otp))
                 print("Entered String  OTP -",entered_otp)
 
-                if str(otp)  == str(entered_otp):
+                if str(otp)  == entered_otp:
                     print("OTP verification successful!")
                     # Create user
                     user = User(username=username, email=email, password=password,phone_number=Phone_Number,  role=role)
                     user.save()
-                    print("saveeee")
+
                     dealer = DealerProfile.objects.create(
                         user=user,
                         Dealer_Name = username,
                         Phone_Number = Phone_Number,
                         Email = email,
                         Natioanality = Natioanality,
-                        Address = address
+                        Address = Address
                     )
-                            
                     if dealer:
 
                                     # Load the HTML template and render it with context
@@ -456,6 +470,8 @@ def otp_send(request):
 
         return JsonResponse({"error":"Invalid Method!"},status=405)
  
+        # return JsonResponse({"error":"Invalid Method!"},status=405)
+ 
 
 @csrf_exempt
 def resend_otp_view(request):
@@ -471,14 +487,18 @@ def resend_otp_view(request):
 
             # Generate a random 6-digit OTP
  
-            account_sid = 'AC4bd461d7feabbbb3a965be18679e34a7'
-            auth_token = 'c8537633c6835bf02231a7e68ee21376'
-            client = Client(account_sid, auth_token)
-            message = client.messages.create(
-            from_='+1 913 270 1336',  # Note the underscore after from
-            body = f"Your OTP code is {otp}. Please use this to verify your account.", # OTP message content
-            to= Phone_Number
-            )
+            sms_response = send_sms(phone_number, otp) 
+            print("sms responce is here")
+            print(sms_response) 
+            if sms_response:
+                print("inside the if")
+                if sms_response.get('type') == "success":
+                    return JsonResponse({"status": "success"})
+                else:
+                    return JsonResponse({"message": msg}, status=500)
+            else:
+                return JsonResponse({"message": "Failed to send OTP."}, status=500)
+            
 
             print(message)
 
@@ -650,7 +670,7 @@ def register_view(request):
             print("email is is_valid-",is_valid)
             print("Before Email valid value",valid_email)
             print("debounce result ",result.get('debounce', {}).get('result'))
-
+            print(role)
             # if 'Invalid' in result:
 
             # elif 'error' in result:
@@ -725,15 +745,25 @@ def register_view(request):
             print(f"Generated OTP: {otp}")  # This is just for testing, remove it in production
             request.session['otp'] = otp
  
-            account_sid = 'AC4bd461d7feabbbb3a965be18679e34a7'
-            auth_token = 'c8537633c6835bf02231a7e68ee21376'
-            client = Client(account_sid, auth_token)
-            message = client.messages.create(
-            from_='+1 913 270 1336',  # Note the underscore after from
-            body = f"Your OTP code is {otp}. Please use this to verify your account.", # OTP message content
-            to= otp_phoneNumber
-            )
-
+            # account_sid = 'AC4bd461d7feabbbb3a965be18679e34a7'
+            # auth_token = '48ca48d86856dac29d4dab1a782a660c'
+            # client = Client(account_sid, auth_token)
+            # message = client.messages.create(
+            # from_='+1 913 270 1336',  # Note the underscore after from
+            # body = f"Your OTP code is {otp}. Please use this to verify your account.", # OTP message content
+            # to= otp_phoneNumber
+            # )
+            sms_response = send_sms(otp_phoneNumber, otp) 
+            print("sms responce is here")
+            print(sms_response) 
+            if sms_response:
+                print("inside the if")
+                if sms_response.get('type') == "success":
+                    return JsonResponse({"status": "success"})
+                else:
+                    return JsonResponse({"message": msg}, status=500)
+            else:
+                return JsonResponse({"message": "Failed to send OTP."}, status=500)
             print(message)
 
             return JsonResponse({'message': 'OTP sent successfully!'})
@@ -781,10 +811,47 @@ def register_view(request):
     except Exception as e:
         print("Exeption is ",e)
     connection.close()
-
     return JsonResponse({'error': 'Invalid method'}, status=405)
+
+msg91_auth_key = "435249A6OkxyFo3G1F675c1c00P1"  
+sender_id = "HUDSME"  
+template_id = "677239f8d6fc056bec55a062"  
+sms_url = "https://api.msg91.com/api/v5/flow/"  
+
+def send_sms(phone_number, otp_variable):
+    headers = {
+        "authkey": msg91_auth_key,
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "flow_id": template_id,
+        "sender": sender_id,
+        "recipients": [
+            {
+                "mobiles": phone_number,
+                "var": otp_variable
+            }
+        ]
+    }
+ 
+    try:
+        print("\n=== Debugging Payload ===")
+        print(json.dumps(payload, indent=2))  
+       
+        response = requests.post(sms_url, json=payload, headers=headers)
+        print("\n=== Msg91 Response ===")
+        print(response.text)
+        # response.raise_for_status()  
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending SMS: {e}")
+        return None
+
+
+
 @csrf_exempt
 def login_view(request):
+    print("login in function entered")
     try:
         # if request.method == 'POST':
                 data = json.loads(request.body)
@@ -800,8 +867,9 @@ def login_view(request):
 
                 print("login type is-",loginType)
 
-
-
+                # email = request.POST['email']
+                # password = request.POST['password']
+                print(dealer_data['password'])
                 print("Request POST is-",request.POST)
                 print("Request POST is-",request.body)
                 print("Request is-",request)
@@ -832,13 +900,21 @@ def login_view(request):
                 #         else:
                 #             return JsonResponse({'error': 'Incorrect Username Or Password'}, status=401)
                 if loginType == User.DEALER:
-                    email = dealer_data.get('email', '')
-                    password = dealer_data.get('password', '')
-                    dealer_data = DealerProfile.objects.get(Email=email)
-                    if dealer_data.account is True:
+                    print("its in login dealer")
+                    email = dealer_data['email']
+                    password = dealer_data['password']
+                    dealer_datas = DealerProfile.objects.get(Email=email)
+                    dealer_data=True
+                    # User = User.objects.get(Email=email, active=is_active)
+                    print(dealer_data)
+                    print(email,password)
+                    if dealer_data:
+                        print("inside dealer data")
                         user = authenticate(request, email=email, password=password)
+                        print(user)
                         if user is not None:
-                            if User.objects.filter(email=email, role=User.DEALER).exists():
+                            print("crossed user is none")
+                            if User.objects.filter(email=email, role="DEALER").exists():
                                 django_login(request, user)
                                 user = request.user.id  # Assuming the user is logged in
                                 dealer = DealerProfile.objects.get(user_id=user)
@@ -852,9 +928,11 @@ def login_view(request):
                                 return JsonResponse({'message': 'Login successfull',"form_submitted":details_sent}, status=200)
                             else:
                                 return JsonResponse({'error': 'Incorrect Username Or Password'}, status=401)
+                        else:
+                             return JsonResponse({'error': 'its from user is none'}, status=401)
                     else:
                         return JsonResponse({'error': 'Your Account has been blocked by Admin'}, status=403)
-                         
+    
                 elif loginType == User.USER:
                     email = user_data.get('email', '')
                     password = user_data.get('password', '')
@@ -863,17 +941,13 @@ def login_view(request):
                     if active is True:
                         user = authenticate(request, email=email, password=password)
                         if user is not None:
-
                             if User.objects.filter(email=email, role=User.USER).exists():
                                 django_login(request, user)
                                 return JsonResponse({'message': 'Login successfull'}, status=200)
-
                             else:
                                 return JsonResponse({'error': 'Incorrect Username Or Password'}, status=401)
                     else:
                         return JsonResponse({'error': 'Your Account has been blocked by Admin'}, status=403)
-                         
-
                 else:
                     return JsonResponse({'error': 'Incorrect  UserName Or Password'}, status=401)
     except Exception as e:
@@ -882,7 +956,7 @@ def login_view(request):
     connection.close()
 
     # return JsonResponse({'error': 'Invalid method'}, status=405) 
-    return JsonResponse({'error': 'Incorrect  UserName Or Password'},status=401) 
+    return JsonResponse({'error': ' laste error Incorrect  UserName Or Password'},status=405) 
 
 # Forget Password
 
@@ -1034,130 +1108,63 @@ def dealer_details(request):
         bank_passBook = request.FILES.get('passbook')
         print("bank_passBook",bank_passBook)
 
-
-        # Retrieve file1 base64 data and file name
-        # aadhar_front_base64 = request.POST.get('aadharfront_base64')
-        # aadhar_front_file_name = request.POST.get('adharfront_fileName')
-        # print(aadhar_front_base64)
-        # print(aadhar_front_file_name)
-        # # Retrieve file2 base64 data and file name (if multiple files)
-        # aadhar_back_base64 = request.POST.get('aadharback_base64')
-        # aadhar_back_file_name = request.POST.get('aadharback_fileName')
-        # print(aadhar_back_base64)
-        # print(aadhar_back_file_name)
-
-        # print(user)
-    
-        # print(f"aadhar- {aadhar_front.name}")
-        # print(f"PanCard- {aadhar_back.name}")
-        # print(f"Aadhar size from request: {aadhar_front.size} bytes")
-        # print(f"PanCard size from request: {aadhar_back.size} bytes")
-        # # Print the first few bytes for debugging (e.g., first 100 bytes)
-        # # print(f"Aadhar file content (first 100 bytes): {aadhar_content[:100]}")
-        # # print(f"PanCard file content (first 100 bytes): {pan_card_content[:100]}")
-        # print("Bucket-",settings.AWS_STORAGE_BUCKET_NAME)
-        # if aadhar_front.size == 0 or aadhar_back.size == 0:
-        #     return HttpResponseBadRequest("Uploaded files are empty.")
-
-        # print(DUMMY_ID)
-
-        # dealer = Dealer_Details(
-        # Dealer_ID = dealer_id, 
-        # Dealer_Name = name,
-        # mail_id = mail_id,
-        # DOB = DOB,
-        # Phone_Number = phone_number,
-        # Address = address,
-        # Aadhar_No = aadharNumber,
-        # Aadhar_Front_Photo = aadhar_front,
-        # Aadhar_Back_Photo = aadhar_back,
-        # PAN_No = panCardNumber,
-        # PAN_Photo = pan_card,
-        # LICENSE_No = licenseNumber,
-        # LICENSE_Front_Photo = license_file_front,
-        # LICENSE_Back_Photo = license_file_back,
-        # Vehicle_No = vehicleNumber,
-        # RC_BOOK_Photo = RC_Book_file,
-        # City = city,
-        # State = state,
-        # Post_Code = postcode,
-        # Country = country,
-        # Nationality = Nationality,
-        # Bank_AccountName = bankAccountName,
-        # Bank_Acc = bankAccountNumber,
-        # IFSC_CODE = ifscCode,
-        # Bank_Statement_Photo = bank_statement,
-        # PassBook_Photo = bank_passBook,
-        # Vehicle_Type = VehicleType
-        # )
-        # dealer.save()
-
-
-        # # if Dealer_Details.objects.filter(Dealer_ID=dealer_id).exists():
-        # #     return JsonResponse({"error":"Dealer Details Already Sent"},status=400)
-        # try:
-        #     # Validate that files were uploaded
-        #     if not aadhar_front or not aadhar_back:
-        #         raise ValueError("Aadhar or Pan Card not uploaded correctly.")
-
-        #     # Create a session with S3
-        #     s3 = boto3.client('s3')
-
-        #     # Reset the file pointers by seeking to the beginning for future operations
-        #     aadhar_front.seek(0)
-        #     aadhar_back.seek(0)
-
-        #     # Read images into memory (BytesIO) once
-        #     aadhar_front_content = aadhar_front.read()  # Store content as bytes
-        #     aadhar_back_content = aadhar_back.read()
-        #     # Print the first few bytes for debugging (e.g., first 100 bytes)
-        #     print(f"Aadhar file content (first 100 bytes): {aadhar_front_content[:100]}")
-        #     print(f"PanCard file content (first 100 bytes): {aadhar_back_content[:100]}")
-        #     # DEBUG: Check the size of the bytes
-        #     print(f"Aadhar size after read: {len(aadhar_front_content)} bytes")
-        #     print(f"Pan card size after read: {len(aadhar_back_content)} bytes")
-
-        #     # Reset the file pointers by seeking to the beginning for future operations
-        #     aadhar_front.seek(0)
-        #     aadhar_back.seek(0)
-
-        #     # Upload images to S3 using the in-memory content
-        #     image1_key = f'uploads/{aadhar_front.name}'
-        #     image2_key = f'uploads/{aadhar_back.name}'
-
-        #     # Upload to S3 (need BytesIO to upload)
-        #     s3.upload_fileobj(BytesIO(aadhar_front_content), settings.AWS_STORAGE_BUCKET_NAME, image1_key)
-        #     s3.upload_fileobj(BytesIO(aadhar_back_content), settings.AWS_STORAGE_BUCKET_NAME, image2_key)
-
-        #     byteAadhar = BytesIO(aadhar_front_content)
-        #     bytePan = BytesIO(aadhar_back_content)
-        #     print("BYTE IO-",byteAadhar)
-        #     print("BYTE IO-",bytePan)
-
-        #     # Create PDF from in-memory images
-        #     pdf_buffer = images_to_pdf([BytesIO(aadhar_front_content), BytesIO(aadhar_back_content)])
-
-        #     if pdf_buffer is None:
-        #         raise Exception("Failed to create PDF due to invalid image data")
-
-        #     # Save PDF to S3
-        #     pdf_key = f'uploads/aadhar_{uuid.uuid4()}.pdf'
-        #     s3.upload_fileobj(pdf_buffer, settings.AWS_STORAGE_BUCKET_NAME, pdf_key)
-
-        #     # Save the PDF model instance with the S3 URL
-        #     pdf_instance = Dealer_Details()
-        #     pdf_instance.aadharPDF = f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{pdf_key}'
-        #     pdf_instance.save()
-
-        # except Exception as e:
-        #     print(f"Error in handle_upload: {e}")
-        #     return HttpResponseServerError(f"Internal server error: {e}")
+        s3_client = boto3.client(
+            's3',
+            endpoint_url='http://82.112.238.156:9000',  
+            aws_access_key_id='minioadmin',          
+            aws_secret_access_key='minioadmin',      
+            region_name='us-east-1'                  
+        )
+ 
+        BUCKET_NAME = 'mybucket'
+        files = [aadhar_front,aadhar_back,pan_card,license_file_front,license_file_back,RC_Book_file,bank_statement,bank_passBook]  # Get all files from 'photos' field
 
 
 
+        # uploaded_files = []
+        failed_files = []
 
-        # print("after")
+        for file in files:
+            try:
+                # Extract the file name
+                file_name = os.path.basename(file.name)
+                logging.debug(f"Uploading file: {file_name}")
 
+                # Upload the file to the VPS bucket
+                s3_client.upload_fileobj(file, BUCKET_NAME, file_name)
+
+                # Generate the file's URL (adjust as per your bucket's configuration)
+                # file_url = f"http://82.112.238.156:9000/{BUCKET_NAME}/{file_name}"
+                # Save the file details in the database
+                # uploaded_image = UploadedImage.objects.create(
+                #     file_name=file_name,
+                #     file_url=file_url
+                # )
+
+                # Add file details to the success list
+                # uploaded_files.append({'file_name': file_name, 'file_url': file_url})
+            except NoCredentialsError:
+                logging.error("Credentials not available")
+                failed_files.append({'file_name': file.name, 'error': 'Credentials not available'})
+            except Exception as e:
+                logging.error(f"Error during file upload: {str(e)}")
+                failed_files.append({'file_name': file.name, 'error': str(e)})
+
+        # Build the response data
+        # response_data = {
+        #     'uploaded_files': uploaded_files,
+        #     'failed_files': failed_files,
+        # }
+
+        # return JsonResponse(response_data, status=200)
+        # aadhar_front = next((file for file in response["files"] if file["file_name"] == "aadhar_front.jpg"), None)
+        # aadhar_back = next((file for file in response["files"] if file["file_name"] == "aadhar_back.jpg"), None)
+        # pan_card = next((file for file in response["files"] if file["file_name"] == "pan_card.jpg"), None)
+        # license_file_front = next((file for file in response["files"] if file["file_name"] == "license_file_front.jpg"), None)
+        # license_file_back = next((file for file in response["files"] if file["file_name"] == "license_file_back.jpg"), None)
+        # RC_Book_file = next((file for file in response["files"] if file["file_name"] == "RC_Book_file.jpg"), None)
+        # bank_statement = next((file for file in response["files"] if file["file_name"] == "bank_statement.jpg"), None)
+        # bank_passBook = next((file for file in response["files"] if file["file_name"] == "bank_passBook.jpg"), None)
 
         if Dealer_Details.objects.filter(Dealer_ID=dealer_id).exists():
             return JsonResponse({"error":"Dealer Details Already Sent"},status=400)
@@ -2035,14 +2042,7 @@ def update_dealer_status(request):
 
 
 
-# Location
-from django.contrib.auth import get_user_model
-from geopy.distance import great_circle
 
-User = get_user_model()  # Reference to the User model
-
-from django.contrib.auth import get_user_model
-from geopy.distance import great_circle
 
 User = get_user_model()  # Reference to the User model
 
@@ -2174,3 +2174,5 @@ def handle_checkbox(request):
         print(active)
         return JsonResponse({'status': 'success', 'isChecked': is_checked})
     return JsonResponse({'status': 'failed'}, status=400)
+
+# Create your views here.
