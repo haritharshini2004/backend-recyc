@@ -815,7 +815,7 @@ def register_view(request):
 
 msg91_auth_key = "435249A6OkxyFo3G1F675c1c00P1"  
 sender_id = "HUDSME"  
-template_id = "677239f8d6fc056bec55a062"  
+template_id = "67777a39d6fc05127c1f9b72"  
 sms_url = "https://api.msg91.com/api/v5/flow/"  
 
 def send_sms(phone_number, otp_variable):
